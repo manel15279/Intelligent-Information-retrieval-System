@@ -115,7 +115,6 @@ def write_relevance_to_file(dict, filename):
                 else:
                     file.write(f"{key} {value}\n")
 
-
 def scalar_product(query, doc, index, dict):
     RSV = 0
 
