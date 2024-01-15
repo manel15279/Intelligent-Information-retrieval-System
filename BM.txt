@@ -1,6 +1,6 @@
 1 YES
 2 YES
-3 NO
+3 YES
 4 NO
-5 NO
-6 NO
+5 YES
+6 YES
