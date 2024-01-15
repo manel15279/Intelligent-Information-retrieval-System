@@ -115,7 +115,7 @@ def write_relevance_to_file(dict, filename):
                 else:
                     file.write(f"{key} {value}\n")
 
-def scalar_product(query, doc, index, dict):
+def scalar_product(query, index, dict):
     RSV = 0
 
     for term in dict.keys():
@@ -130,7 +130,7 @@ def scalar_product(query, doc, index, dict):
 
     return RSV
 
-def cosine_measure(query, doc, index, dict):
+def cosine_measure(query, index, dict):
     RSV = 0
     sum_vi = 0
     sum_wi = 0
@@ -153,7 +153,7 @@ def cosine_measure(query, doc, index, dict):
     res = RSV / (np.sqrt(sum_vi) * np.sqrt(sum_wi))
     return res
 
-def jaccard_measure(query, doc, index, dict):
+def jaccard_measure(query, index, dict):
     RSV = 0
     sum_vi = 0
     sum_wi = 0
@@ -208,17 +208,17 @@ def vectorial_model(query, files, Tokenize, PorterStemmer, SP, cosine, jaccard):
 
     for id, doc in docs.items():
         if SP:
-            RSV = scalar_product(query, doc, id, dict)
+            RSV = scalar_product(query, id, dict)
             if RSV != 0.0:
                 ranking[id] = RSV
         else: 
             if cosine:
-                RSV = cosine_measure(query, doc, id, dict)
+                RSV = cosine_measure(query, id, dict)
                 if RSV != 0.0:
                     ranking[id] = RSV
             else:
                 if jaccard:
-                    RSV = jaccard_measure(query, doc, id, dict)
+                    RSV = jaccard_measure(query, id, dict)
                     if RSV != 0.0:
                         ranking[id] = RSV
 
