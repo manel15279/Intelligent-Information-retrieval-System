@@ -13,10 +13,14 @@ import numpy as np
 from collections import defaultdict
 from collections import Counter
 from collections import OrderedDict
+import matplotlib.pyplot as plt
+from collections import defaultdict
 
 #nltk.download()
 
 files = os.listdir(os.path.abspath("Collection"))
+queries_file = 'LISA COLLECTION\\Query.txt'
+judgements_file = 'LISA COLLECTION\\LISARJ.NUM'
 
 
 def tokenization(text):
@@ -43,52 +47,55 @@ def normalization_lancaster(tokens): #stemming
     normalized_words = [Lancaster.stem(word) for word in tokens]
     return normalized_words
 
-
-def index(files, Inverse, Tokenize, PorterStemmer):
+def index(file_path, Inverse, Tokenize, PorterStemmer):
     word_file_count = defaultdict(set)
+    unique_document_numbers = set() 
     d = {}
     dict = {}
-    for filename in files: 
-        with open(os.path.join("Collection", filename), "r") as file:
-            text = file.read()
+    with open(file_path, 'r', encoding='utf-8') as file:
+        for line in file:
+            parts = line.strip().split('|', 1)
+            
+            if len(parts) == 2:
+                file_id, text = parts
+                file_id = file_id.strip()
+                print(f"file_id={file_id}")
+                unique_document_numbers.add(file_id)
 
-            if Tokenize:
-                tokens = tokenization(text)
-            else:
-                tokens = text.split()
-
-            tokens_without_stopwords = stop_words(tokens)
-
-            if PorterStemmer:
-                normalized_words = normalization_porter(tokens_without_stopwords)
-            else:
-                normalized_words = normalization_lancaster(tokens_without_stopwords)
-
-            words_frequency = nltk.FreqDist(normalized_words)
-
-            file_id = int(re.search(r'\d+', os.path.basename(filename)).group())
-
-            for word in words_frequency.keys():
-                if Inverse:
-                    if word in d:
-                        d[word].append((file_id, words_frequency[word], max(list(words_frequency.values()))))
-                    else:
-                        d[word] = [(file_id, words_frequency[word], max(list(words_frequency.values())))]
+                if Tokenize:
+                    tokens = tokenization(text)
                 else:
-                    if file_id in d:
-                        d[file_id].append((word, words_frequency[word], max(list(words_frequency.values()))))
+                    tokens = text.split()
+
+                tokens_without_stopwords = stop_words(tokens)
+
+                if PorterStemmer:
+                    normalized_words = normalization_porter(tokens_without_stopwords)
+                else:
+                    normalized_words = normalization_lancaster(tokens_without_stopwords)
+
+                words_frequency = nltk.FreqDist(normalized_words)
+
+
+                for word in words_frequency.keys():
+                    if Inverse:
+                        if word in d:
+                            d[word].append((file_id, words_frequency[word], max(list(words_frequency.values()))))
+                        else:
+                            d[word] = [(file_id, words_frequency[word], max(list(words_frequency.values())))]
                     else:
-                        d[file_id] = [(word, words_frequency[word], max(list(words_frequency.values())))]
-
-                    word_file_count[word].add(file_id)
-
+                        if file_id in d:
+                            d[file_id].append((word, words_frequency[word], max(list(words_frequency.values()))))
+                        else:
+                            d[file_id] = [(word, words_frequency[word], max(list(words_frequency.values())))]
+                        word_file_count[word].add(file_id)
 
     for key1, values in d.items():
         for (key2, freq, max_freq) in values:
                 if Inverse:
-                    value = (key2, freq, (freq / max_freq) * np.log10(((len(files) / len(d[key1]))+1)))
+                    value = (key2, freq, (freq / max_freq) * np.log10(((len(unique_document_numbers) / len(d[key1]))+1)))
                 else: 
-                    value = (key2, freq, (freq / max_freq) * np.log10(((len(files) / len(word_file_count[key2]))+1)))
+                    value = (key2, freq, (freq / max_freq) * np.log10(((len(unique_document_numbers) / len(word_file_count[key2]))+1)))
                 if key1 in dict:
                     dict[key1].append(value)
                 else:
@@ -96,167 +103,12 @@ def index(files, Inverse, Tokenize, PorterStemmer):
                     
     return dict
 
-
 def write_dict_to_file(dictionary, filename):
-    with open(filename, 'w') as file:
+    with open(filename, 'w', encoding='utf-8') as file:
         for key, values in dictionary.items():
             for value in values:
                 (files_list, freq, weight) = value
                 file.write(f"{key} {files_list} {freq} {weight:.5f}\n")
-
-def write_relevance_to_file(dict, filename):
-    with open(filename, 'w') as file:
-        if dict == None:
-            file.write("Invalid query !")
-        else:
-            for key, value in dict.items():
-                if type(value) == float:
-                    file.write(f"{key} {value:.5f}\n")
-                else:
-                    file.write(f"{key} {value}\n")
-
-def scalar_product(query, index, dict):
-    RSV = 0
-
-    for term in dict.keys():
-        term_query_weight = 1 if term in query else 0
-        weight = [t[2] for t in dict[term] if t[0] == index]
-        if not weight:
-            weight = 0
-        else:
-            weight = weight[0]
-        term_weight = term_query_weight * weight
-        RSV += term_weight
-
-    return RSV
-
-def cosine_measure(query, index, dict):
-    RSV = 0
-    sum_vi = 0
-    sum_wi = 0
-
-    for term in dict.keys():
-        term_query_weight = 1 if term in query else 0
-        weight = [t[2] for t in dict[term] if t[0] == index]
-        if not weight:
-            weight = 0
-        else:
-            weight = weight[0]
-        term_weight = term_query_weight * weight
-        RSV += term_weight
-        sum_wi += (weight**2)
-        sum_vi += (term_query_weight**2)
-    
-    if np.sqrt(sum_vi) == 0 or np.sqrt(sum_wi) == 0:
-        return 0.0
-
-    res = RSV / (np.sqrt(sum_vi) * np.sqrt(sum_wi))
-    return res
-
-def jaccard_measure(query, index, dict):
-    RSV = 0
-    sum_vi = 0
-    sum_wi = 0
-
-    for term in dict.keys():
-        term_query_weight = 1 if term in query else 0
-        weight = [t[2] for t in dict[term] if t[0] == index]
-        if not weight:
-            weight = 0
-        else:
-            weight = weight[0]
-        term_weight = term_query_weight * weight
-        RSV += term_weight
-        sum_wi += weight**2
-        sum_vi += term_query_weight**2
-
-    if (sum_vi + sum_wi - RSV) == 0:
-        return 0.0
-
-    res = RSV / ((sum_vi + sum_wi) - RSV)
-    return res
-
-def preprocessing(files, Tokenize, PorterStemmer):
-    docs = {}
-
-    for filename in files: 
-        with open(os.path.join("Collection", filename), "r") as file:
-            text = file.read()
-
-            if Tokenize:
-                tokens = tokenization(text)
-            else:
-                tokens = text.split()
-
-            tokens_without_stopwords = stop_words(tokens)
-
-            if PorterStemmer:
-                normalized_words = normalization_porter(tokens_without_stopwords)
-            else:
-                normalized_words = normalization_lancaster(tokens_without_stopwords)
-            
-            file_id = int(re.search(r'\d+', os.path.basename(filename)).group())
-            docs[file_id] = normalized_words
-    return docs
-
-def vectorial_model(query, files, Tokenize, PorterStemmer, SP, cosine, jaccard):
-    docs = preprocessing(files, Tokenize, PorterStemmer)
-    query = preprocess_query(query, Tokenize, PorterStemmer)
-    dict = index(files, True, Tokenize, PorterStemmer)
-    ranking = OrderedDict()
-    N = len(docs)
-
-    for id, doc in docs.items():
-        if SP:
-            RSV = scalar_product(query, id, dict)
-            if RSV != 0.0:
-                ranking[id] = RSV
-        else: 
-            if cosine:
-                RSV = cosine_measure(query, id, dict)
-                if RSV != 0.0:
-                    ranking[id] = RSV
-            else:
-                if jaccard:
-                    RSV = jaccard_measure(query, id, dict)
-                    if RSV != 0.0:
-                        ranking[id] = RSV
-
-        ranking = OrderedDict(sorted(ranking.items(), key=lambda x: x[1], reverse=True))
-
-    return ranking
-
-def BM25(query, dict, docs, docs_id, K, B):
-    ranking = OrderedDict()
-    N = len(docs_id)
-    
-    s = 0
-    for doc in docs.values():
-        s += len(doc)
-    avdl = s / N
-
-    for index, doc in docs.items():
-        RSV = 0 
-        for term in query:
-            freq = doc.count(term)
-            nbr_docs = len(dict[term])
-            term_weight = (freq / (K * ((1 - B) + B * (len(doc) / avdl)) + freq))
-            RSV += (term_weight * np.log10(((N - nbr_docs + 0.5) / (nbr_docs + 0.5))))
-
-        if RSV != 0.0:
-            ranking[index] = RSV
-
-    ranking = OrderedDict(sorted(ranking.items(), key=lambda x: x[1], reverse=True))
-    return ranking
-
-def probabilistic_model(query, files, Tokenize, PorterStemmer, K, B):
-    query = preprocess_query(query, Tokenize, PorterStemmer)
-    docs = preprocessing(files, Tokenize, PorterStemmer)
-    docs_id = get_docs_ids(files)
-    dict = index(files, True, Tokenize, PorterStemmer)
-    results = results = BM25(query, dict, docs, docs_id, K, B)
-
-    return results
 
 def preprocess_query(query, Tokenize, PorterStemmer):
 
@@ -270,12 +122,152 @@ def preprocess_query(query, Tokenize, PorterStemmer):
         q = normalization_lancaster(q)
     return q
 
-def get_docs_ids(files):
-    docs_id = []
-    for filename in files: 
-        file_id = int(re.search(r'\d+', os.path.basename(filename)).group())
-        docs_id.append(file_id)
-    return docs_id
+def file(Tokenize, PorterStemmer):
+    if Tokenize:
+        if PorterStemmer:
+            return "InverseTokenPorter.txt"
+        else:
+            return "InverseTokenLancaster.txt"
+    else:
+        if PorterStemmer:
+            return "InverseSplitPorter.txt"
+        else:
+            return "InverseSplitLancaster.txt"
+        
+def scalar_product(query, file_path):
+    terms_by_doc = {}
+    with open(file_path, 'r') as file:
+        for line in file:
+            term, doc_id, freq, weight = line.split()
+            if term in query:
+                weight = float(weight) 
+
+                if doc_id in terms_by_doc:
+                    terms_by_doc[doc_id] += weight
+                else:
+                    terms_by_doc[doc_id] = weight
+
+    terms_by_doc = sorted(terms_by_doc.items(), key=lambda x: x[1], reverse=True)
+
+    return terms_by_doc
+
+def cosine_measure(query, file_path):
+    terms_by_doc = scalar_product(query, file_path)
+    weight_by_doc = {}
+    result_by_doc = {}
+    sum_vi = len(query)
+
+    with open(file_path, 'r') as file:
+        for line in file:
+            term, doc, freq, weight = line.split()
+            weight = float(weight) 
+  
+            if doc in weight_by_doc:
+                weight_by_doc[doc] += weight**2
+            else:
+                weight_by_doc[doc] = weight**2
+
+    sum_vi = math.sqrt(sum_vi)
+    
+    for doc, sum_squared in weight_by_doc.items():
+        weight_by_doc[doc] = math.sqrt(sum_squared)
+
+    for doc, terms in terms_by_doc.items():
+        result_by_doc[doc] = terms / (sum_vi * weight_by_doc[doc])
+
+    result_by_doc= sorted(result_by_doc.items(), key=lambda x: x[1], reverse=True)
+
+    return result_by_doc
+
+def jaccard_measure(query, file_path):
+    terms_by_doc = scalar_product(query, file_path)
+    weight_by_doc = {}
+    result_by_doc = {}
+    sum_vi = len(query)
+
+    with open(file_path, 'r') as file:
+        for line in file:
+            term, doc, freq, weight = line.split()
+            weight = float(weight)  
+  
+            if doc in weight_by_doc:
+                weight_by_doc[doc] += weight**2
+            else:
+                weight_by_doc[doc] = weight**2
+
+    for doc, terms in terms_by_doc.items():
+        result_by_doc[doc] = terms / (sum_vi + weight_by_doc[doc] - terms)
+
+    result_by_doc= sorted(result_by_doc.items(), key=lambda x: x[1], reverse=True)
+
+    return result_by_doc
+
+def vectorial_model(query, Tokenize, PorterStemmer, SP, cosine, jaccard):
+        query = preprocess_query(query, Tokenize, PorterStemmer)
+        file_path = file(Tokenize, PorterStemmer)
+        if SP:
+            result = scalar_product(query, file_path)
+        else: 
+            if cosine:
+                result = cosine_measure(query, file_path)
+            else:
+                if jaccard:
+                    result = jaccard_measure(query, file_path)
+
+        return result
+
+def n_docs_terms(file_path, query):
+    documents_containing_terms = {}
+
+    with open(file_path, 'r') as file:
+        for line in file:
+            current_term, _, _, _ = line.strip().split()
+
+            if current_term in query:
+                if current_term not in documents_containing_terms:
+                    documents_containing_terms[current_term] = 1
+                else:
+                    documents_containing_terms[current_term] += 1
+            elif len(documents_containing_terms) == len(query):
+                # If we have encountered all terms and the next one is different, stop the loop
+                break
+    return documents_containing_terms
+
+def BM25(query, file_path, K, B):
+    dl = {}
+    result = {}
+    vocab_len = 0
+
+    with open(file_path, 'r') as file:
+        for line in file:
+            _, doc_id, freq, _ = line.strip().split()
+            dl[doc_id] = dl.get(doc_id, 0) + int(freq)
+            vocab_len += int(freq)
+
+    N = len(dl)
+    avdl = vocab_len / N
+    ni = n_docs_terms(file_path, query)
+
+    with open(file_path, 'r') as file:
+        for line in file:
+            term, doc, freq, _ = line.split()
+            freq = int(freq)
+            if term in query:
+                if doc in result:
+                    result[doc] += ((freq / (K * ((1 - B) + B * (dl[doc] / avdl)) + freq)) * np.log10(((N - ni[term] + 0.5) / (ni[term] + 0.5))))
+                else:
+                    result[doc] = ((freq / (K * ((1 - B) + B * (dl[doc] / avdl)) + freq)) * np.log10(((N - ni[term] + 0.5) / (ni[term] + 0.5))))
+                    
+    result = sorted(result.items(), key=lambda x: x[1], reverse=True)
+
+    return result
+
+def probabilistic_model(query, Tokenize, PorterStemmer, K, B):
+    query = preprocess_query(query, Tokenize, PorterStemmer)
+    file_path = file(Tokenize, PorterStemmer)
+    result = BM25(query, file_path, K, B)
+        
+    return result
 
 def boolean_query(query):
     
@@ -319,58 +311,142 @@ def is_valid_boolean_query(matches):
         
     return True
 
-def boolean_query_evaluation(query, dict, docs_id):
-
+def boolean_query_evaluation(query, file_path):
     terms_and_operators = boolean_query(query)
-    if terms_and_operators == None:
+    
+    if terms_and_operators is None:
         return None
     else:
-        
-        result_set = set(docs_id)
+        result_set = set()
 
-        operator_stack = []
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+            operator_stack = []
 
-        for token in terms_and_operators:
-            if token == 'not':
-                operator_stack.append('not')
-            elif token == 'and':
-                operator_stack.append('and')
-            elif token == 'or':
-                operator_stack.append('or')
-            else:
-                term_results = set(tup[0] for tup in dict[token]) if token in dict else set()
-                if 'not' in operator_stack:
-                    term_results = set(docs_id) - term_results
-                    operator_stack.remove('not')
-                if 'and' in operator_stack:
-                    result_set = result_set.intersection(term_results)
-                    operator_stack.remove('and')
-                elif 'or' in operator_stack:
-                    result_set = result_set.union(term_results)
-                    operator_stack.remove('or')
+            for token in terms_and_operators:
+                if token == 'not':
+                    operator_stack.append('not')
+                elif token == 'and':
+                    operator_stack.append('and')
+                elif token == 'or':
+                    operator_stack.append('or')
                 else:
-                    result_set = term_results
+                    term_results = set()
+                    
+                    for line in lines:
+                        term, doc, _, _ = line.strip().split()
+                        doc = int(doc)
+
+                        if term == token:
+                            term_results.add(doc)
+
+                    if 'not' in operator_stack:
+                        term_results = set() - term_results
+                        operator_stack.remove('not')
+                    if 'and' in operator_stack:
+                        result_set = result_set.intersection(term_results)
+                        operator_stack.remove('and')
+                    elif 'or' in operator_stack:
+                        result_set = result_set.union(term_results)
+                        operator_stack.remove('or')
+                    else:
+                        result_set = term_results
 
         return result_set
     
-def boolean_model(query, files, Tokenize, PorterStemmer):
-    result_dict = {}
+def boolean_model(query, Tokenize, PorterStemmer):
     query = preprocess_query(query, Tokenize, PorterStemmer)
-    print(query)
-    docs_id = get_docs_ids(files)
-    dict = index(files, True, Tokenize, PorterStemmer)
-    results = boolean_query_evaluation(query, dict, docs_id)
-    if results != None:
-        for doc in docs_id:
-            if doc in results:
-                result_dict[doc] = 'YES'
-            else:
-                result_dict[doc] = 'NO'
+    file_path = file(Tokenize, PorterStemmer)
+
+    result_dict = {}
+    results = boolean_query_evaluation(query, file_path)
+    
+    if results is not None:
+        for doc in results:
+            result_dict[doc] = 'YES'
     else:
         result_dict = None
 
     return result_dict
 
+
+def precision(relevant_docs, retrieved_docs, cutoff=None):
+    total_retrieved = len(retrieved_docs[:cutoff])
+    if total_retrieved == 0:
+        return 0
+    if cutoff == None:
+        cutoff = total_retrieved
+    relevant_retrieved = len(set(relevant_docs) & set(retrieved_docs[:cutoff]))
+    return relevant_retrieved / cutoff
+
+def recall(relevant_docs, retrieved_docs, cutoff=None):
+    total_relevant = len(relevant_docs)
+    if total_relevant == 0:
+        return 0
+    relevant_retrieved = len(set(relevant_docs) & set(retrieved_docs[:cutoff]))
+    return relevant_retrieved / total_relevant
+
+def f_score(precision_value, recall_value):
+    if precision_value + recall_value > 0:
+        return 2 * (precision_value * recall_value) / (precision_value + recall_value)
+    else:
+        return 0
+    
+def interpolate_precision(precision_values, recall_values, recall_levels):
+    interpolated_precisions = []
+    for level in recall_levels:
+        max_precision = 0
+        for i in range(len(recall_values)):
+            if recall_values[i] >= level:
+                max_precision = max(max_precision, precision_values[i])
+        interpolated_precisions.append(max_precision)
+    return interpolated_precisions
+
+def plot_precision_recall_curve(relevant_docs, retrieved_docs):
+    recall_levels = [i / 10 for i in range(11)]
+    
+    # Calculate precision at each recall level
+    precision_values = [precision(relevant_docs, retrieved_docs, cutoff=int(len(retrieved_docs) * level)) for level in recall_levels]
+    
+    # Calculate interpolated precisions
+    interpolated_precisions = interpolate_precision(precision_values, recall_levels, recall_levels)
+
+    plt.plot(recall_levels, interpolated_precisions, marker='o', linestyle='-')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+def queries_tolist(queries_file):
+    with open(queries_file, 'r') as file:
+        queries = [line.strip().split('|', 1) for line in file]
+    return queries
+
+def judgements_tolist(judgements_file):
+    query_relevant_docs = {}
+
+    with open(judgements_file, 'r') as file:
+        lines = file.readlines()
+
+        for line in lines:
+            tokens = line.split()
+            query_id = int(tokens[0])
+            num_relevant_docs = int(tokens[1])
+            relevant_docs = [int(tokens[i]) for i in range(2, len(tokens))]
+            query_relevant_docs[query_id] = {'num_relevant_docs': num_relevant_docs, 'relevant_docs': relevant_docs}
+
+    return query_relevant_docs
+
+def metrics(selected_docs, selected_relevant_docs):
+    precision_value = precision(selected_relevant_docs, selected_docs)
+    precision_5 = precision(selected_relevant_docs, selected_docs, 5)
+    precision_10 = precision(selected_relevant_docs, selected_docs, 10)
+    recall_value = recall(selected_relevant_docs, selected_docs)
+    f_score_value = f_score(precision_value, recall_value) 
+
+    return precision_value, precision_5, precision_10, recall_value, f_score_value
 
 
 class MyGUI(QMainWindow):
@@ -437,26 +513,14 @@ class MyGUI(QMainWindow):
             self.sp = self.radioButton_SP.isChecked()
             self.cm = self.radioButton_CM.isChecked()
             self.jm = self.radioButton_JM.isChecked()
-            self.results = vectorial_model(query, files, self.Tokenize, self.PorterStemmer, self.sp, self.cm, self.jm)
-            if self.sp:
-                filename = "VsmScalarProduct.txt"
-            else:
-                if self.cm:
-                    filename = "VsmCosineMeasure.txt"
-                else:
-                    if self.jm:
-                        filename ="VsmJaccardMeasure.txt"
-
-            write_relevance_to_file(self.results, filename)
-            self.display_search_results2(self.results)
+            self.results = vectorial_model(query, self.Tokenize, self.PorterStemmer, self.sp, self.cm, self.jm)
 
         else :
             if self.radioButton_proba.isChecked():
                 self.K = self.lineEdit_K.text()
                 self.B = self.lineEdit_B.text()
-                self.results = probabilistic_model(query, files, self.Tokenize, self.PorterStemmer, float(self.K), float(self.B))
-                filename = "PmBM25.txt"
-                write_relevance_to_file(self.results, filename)
+                self.results = probabilistic_model(query, self.Tokenize, self.PorterStemmer, float(self.K), float(self.B))
+                
                 self.display_search_results2(self.results)
 
 
@@ -493,9 +557,8 @@ class MyGUI(QMainWindow):
                     self.display_search_results(self.results)
 
                 elif self.radioButton_bool.isChecked():
-                    self.results = boolean_model(query, files, self.Tokenize, self.PorterStemmer)
-                    filename = "BM.txt"
-                    write_relevance_to_file(self.results, filename)
+                    self.results = boolean_model(query, self.Tokenize, self.PorterStemmer)
+                    
                     self.display_search_results3(self.results)
     
         
@@ -522,11 +585,11 @@ class MyGUI(QMainWindow):
         self.tableWidget.setHorizontalHeaderLabels(["N Doc", "Relevance"])
         self.tableWidget.setRowCount(0)
         
-        for key, value in results.items():
+        for (key, value) in results:
                 rowPosition = self.tableWidget.rowCount()
                 self.tableWidget.insertRow(rowPosition)
                 self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem(str(key)))
-                self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(f"{value:.5f}"))
+                self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(f"{float(value):.5f}"))
                 
         total_width = self.tableWidget.viewport().width()
         column_width = int(total_width / self.tableWidget.columnCount())
@@ -534,7 +597,7 @@ class MyGUI(QMainWindow):
             self.tableWidget.setColumnWidth(column, column_width)
 
     def display_search_results3(self, results):
-        self.tableWidget.setHorizontalHeaderLabels(["N Doc", "YES/NO"])
+        self.tableWidget.setHorizontalHeaderLabels(["N Doc", "Relevance"])
         self.tableWidget.setRowCount(0)
         if self.results == None:
             rowPosition = self.tableWidget.rowCount()

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1191</width>
-    <height>846</height>
+    <width>1186</width>
+    <height>889</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,7 +20,7 @@
       <x>10</x>
       <y>160</y>
       <width>831</width>
-      <height>651</height>
+      <height>681</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout">
@@ -52,6 +52,9 @@
        <property name="topMargin">
         <number>10</number>
        </property>
+       <property name="bottomMargin">
+        <number>20</number>
+       </property>
        <item>
         <widget class="QTableWidget" name="tableWidget"/>
        </item>
@@ -59,6 +62,81 @@
         <widget class="QScrollBar" name="verticalScrollBar_4">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_5">
+       <property name="topMargin">
+        <number>10</number>
+       </property>
+       <property name="bottomMargin">
+        <number>10</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="label_precision">
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>Precision : </string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_p5">
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>P@5 : </string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_p10">
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>P@10 :</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_recall">
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>Recall : </string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_fscore">
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>F-Score : </string>
          </property>
         </widget>
        </item>
@@ -161,20 +239,6 @@
       </widget>
      </item>
      <item>
-      <widget class="QRadioButton" name="radioButton_indexs">
-       <property name="font">
-        <font>
-         <pointsize>10</pointsize>
-         <weight>75</weight>
-         <bold>true</bold>
-        </font>
-       </property>
-       <property name="text">
-        <string>Indexs</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
         <widget class="QGroupBox" name="groupBox_value">
@@ -193,7 +257,7 @@
            <rect>
             <x>0</x>
             <y>20</y>
-            <width>241</width>
+            <width>248</width>
             <height>41</height>
            </rect>
           </property>
@@ -210,6 +274,13 @@
            <property name="bottomMargin">
             <number>10</number>
            </property>
+           <item>
+            <widget class="QCheckBox" name="radioButton_indexs">
+             <property name="text">
+              <string/>
+             </property>
+            </widget>
+           </item>
            <item>
             <widget class="QRadioButton" name="radioButton_inverse">
              <property name="font">
@@ -316,7 +387,7 @@
       <x>839</x>
       <y>-1</y>
       <width>341</width>
-      <height>811</height>
+      <height>841</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_4">
@@ -336,6 +407,16 @@
       <number>11</number>
      </property>
      <item>
+      <widget class="QCheckBox" name="checkBox_queries_dataset">
+       <property name="text">
+        <string>Queries Dataset</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QSpinBox" name="spinBox"/>
+     </item>
+     <item>
       <widget class="QGroupBox" name="groupBox_2">
        <property name="font">
         <font>
@@ -353,7 +434,7 @@
           <x>0</x>
           <y>20</y>
           <width>321</width>
-          <height>561</height>
+          <height>451</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -545,6 +626,16 @@
          </item>
         </layout>
        </widget>
+       <widget class="QGraphicsView" name="plot">
+        <property name="geometry">
+         <rect>
+          <x>5</x>
+          <y>490</y>
+          <width>311</width>
+          <height>321</height>
+         </rect>
+        </property>
+       </widget>
       </widget>
      </item>
     </layout>
@@ -555,7 +646,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1191</width>
+     <width>1186</width>
      <height>18</height>
     </rect>
    </property>
