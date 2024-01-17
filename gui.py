@@ -417,7 +417,10 @@ def plot_precision_recall_curve(relevant_docs, retrieved_docs):
     plt.title('Precision-Recall Curve')
     plt.grid(True)
     plt.legend()
-    plt.show()
+    image_path = 'precision_recall_curve.png'
+    plt.savefig(image_path, format='png')
+    plt.close()
+
 
 def queries_tolist(queries_file):
     with open(queries_file, 'r') as file:
@@ -520,9 +523,6 @@ class MyGUI(QMainWindow):
                 self.K = self.lineEdit_K.text()
                 self.B = self.lineEdit_B.text()
                 self.results = probabilistic_model(query, self.Tokenize, self.PorterStemmer, float(self.K), float(self.B))
-                
-                self.display_search_results2(self.results)
-
 
             else:
                 if self.radioButton_indexs.isChecked():
@@ -559,7 +559,19 @@ class MyGUI(QMainWindow):
                 elif self.radioButton_bool.isChecked():
                     self.results = boolean_model(query, self.Tokenize, self.PorterStemmer)
                     
-                    self.display_search_results3(self.results)
+        if self.checkBox_queries_dataset.isChecked():
+                
+                self.queries = queries_tolist(queries_file)
+                self.judgements = judgements_tolist(judgements_file)
+                dict = {key: value for key, value in self.result}
+                query_id = self.spinBox.value()
+                _, relevant_docs = judgement[query_id]
+                selected_docs = self.results.keys().tolist()
+                selected_relevant_docs = [doc for doc in relevant_docs if doc in selected_docs]
+                metric = metrics(selected_docs, selected_relevant_docs)
+                plot = plot_precision_recall_curve(relevant_docs, selected_docs)
+
+        self.display_search_results2(self.results, metric, plot)
     
         
 
@@ -581,7 +593,7 @@ class MyGUI(QMainWindow):
         for column in range(self.tableWidget.columnCount()):
             self.tableWidget.setColumnWidth(column, column_width)
     
-    def display_search_results2(self, results):
+    def display_search_results2(self, results, metric, plot):
         self.tableWidget.setHorizontalHeaderLabels(["N Doc", "Relevance"])
         self.tableWidget.setRowCount(0)
         
@@ -589,32 +601,33 @@ class MyGUI(QMainWindow):
                 rowPosition = self.tableWidget.rowCount()
                 self.tableWidget.insertRow(rowPosition)
                 self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem(str(key)))
-                self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(f"{float(value):.5f}"))
+                if self.radioButton_bool.isChecked():
+                    self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(str(value)))
+                else:
+                    self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(f"{float(value):.5f}"))
                 
         total_width = self.tableWidget.viewport().width()
         column_width = int(total_width / self.tableWidget.columnCount())
         for column in range(self.tableWidget.columnCount()):
             self.tableWidget.setColumnWidth(column, column_width)
 
-    def display_search_results3(self, results):
-        self.tableWidget.setHorizontalHeaderLabels(["N Doc", "Relevance"])
-        self.tableWidget.setRowCount(0)
-        if self.results == None:
-            rowPosition = self.tableWidget.rowCount()
-            self.tableWidget.insertRow(rowPosition)
-            self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem('Invalid query !'))
-        else:
-            
-            for key, value in results.items():
-                    rowPosition = self.tableWidget.rowCount()
-                    self.tableWidget.insertRow(rowPosition)
-                    self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem(str(key)))
-                    self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(str(value)))
-                    
-            total_width = self.tableWidget.viewport().width()
-            column_width = int(total_width / self.tableWidget.columnCount())
-            for column in range(self.tableWidget.columnCount()):
-                self.tableWidget.setColumnWidth(column, column_width)
+        precision_value, precision_5, precision_10, recall_value, f_score_value = metric
+        self.label_precision.setText(f"Precision = {precision_value:.5f}")
+        self.label_p5.setText(f"Precision@5: {precision_5:.5f}")
+        self.label_p10.setText(f"Precision@10: {precision_10:.5f}")
+        self.label_recall.setText(f"Recall: {recall_value:.5f}")
+        self.label_fscore.setText(f"F-score: {f_score_value:.5f}")
+
+        # Set the plot
+        pixmap = QPixmap('precision_recall_curve.png')
+        item = QGraphicsPixmapItem(pixmap)
+        scene = QGraphicsScene()
+        scene.addItem(item)
+
+        self.plot.setScene(scene)
+
+        
+
 
 
 def main():
