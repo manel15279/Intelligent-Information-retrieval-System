@@ -2,6 +2,8 @@ import typing
 from PyQt5.QtWidgets import *
 from PyQt5 import QtCore, uic
 from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QGraphicsScene, QGraphicsPixmapItem
+from PyQt5.QtGui import QPixmap
 import nltk
 import os
 from nltk.corpus import stopwords
@@ -15,12 +17,14 @@ from collections import Counter
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 from collections import defaultdict
+import math
+import pandas as pd
 
 #nltk.download()
 
 files = os.listdir(os.path.abspath("Collection"))
 queries_file = 'LISA COLLECTION\\Query.txt'
-judgements_file = 'LISA COLLECTION\\LISARJ.NUM'
+judgements_file = 'LISA COLLECTION\\LISA.REL'
 
 
 def tokenization(text):
@@ -47,19 +51,42 @@ def normalization_lancaster(tokens): #stemming
     normalized_words = [Lancaster.stem(word) for word in tokens]
     return normalized_words
 
-def index(file_path, Inverse, Tokenize, PorterStemmer):
-    word_file_count = defaultdict(set)
-    unique_document_numbers = set() 
-    d = {}
-    dict = {}
+def extract_documents(file_path):
+    documents = []
+    current_document = {"number": None, "text": ""}
+    
     with open(file_path, 'r', encoding='utf-8') as file:
         for line in file:
-            parts = line.strip().split('|', 1)
+            line = line.strip()
             
-            if len(parts) == 2:
-                file_id, text = parts
-                file_id = file_id.strip()
-                print(f"file_id={file_id}")
+            if line.startswith("Document"):
+                
+                if current_document["number"] is not None:
+                    documents.append(current_document.copy())
+                
+                current_document["number"] = int(line.split()[1])
+                current_document["text"] = ""
+            elif line:
+                
+                current_document["text"] += line + '\n'
+    
+
+    if current_document["number"] is not None:
+        documents.append(current_document.copy())
+    
+    return documents
+
+def index(file_path, Inverse, Tokenize, PorterStemmer):
+            word_file_count = defaultdict(set)
+            unique_document_numbers = set() 
+            d = {}
+            dict = {}
+            
+            documents = extract_documents(file_path)
+
+            for document in documents:
+                file_id = document["number"]
+                text = document["text"]
                 unique_document_numbers.add(file_id)
 
                 if Tokenize:
@@ -76,7 +103,6 @@ def index(file_path, Inverse, Tokenize, PorterStemmer):
 
                 words_frequency = nltk.FreqDist(normalized_words)
 
-
                 for word in words_frequency.keys():
                     if Inverse:
                         if word in d:
@@ -90,18 +116,19 @@ def index(file_path, Inverse, Tokenize, PorterStemmer):
                             d[file_id] = [(word, words_frequency[word], max(list(words_frequency.values())))]
                         word_file_count[word].add(file_id)
 
-    for key1, values in d.items():
-        for (key2, freq, max_freq) in values:
-                if Inverse:
-                    value = (key2, freq, (freq / max_freq) * np.log10(((len(unique_document_numbers) / len(d[key1]))+1)))
-                else: 
-                    value = (key2, freq, (freq / max_freq) * np.log10(((len(unique_document_numbers) / len(word_file_count[key2]))+1)))
-                if key1 in dict:
-                    dict[key1].append(value)
-                else:
-                    dict[key1] = [value]
-                    
-    return dict
+            for key1, values in d.items():
+                for (key2, freq, max_freq) in values:
+                        if Inverse:
+                            value = (key2, freq, (freq / max_freq) * np.log10(((len(unique_document_numbers) / len(d[key1]))+1)))
+                        else: 
+                            value = (key2, freq, (freq / max_freq) * np.log10(((len(unique_document_numbers) / len(word_file_count[key2]))+1)))
+                        if key1 in dict:
+                            dict[key1].append(value)
+                        else:
+                            dict[key1] = [value]
+                            
+            return dict
+
 
 def write_dict_to_file(dictionary, filename):
     with open(filename, 'w', encoding='utf-8') as file:
@@ -172,7 +199,7 @@ def cosine_measure(query, file_path):
     for doc, sum_squared in weight_by_doc.items():
         weight_by_doc[doc] = math.sqrt(sum_squared)
 
-    for doc, terms in terms_by_doc.items():
+    for (doc, terms) in terms_by_doc:
         result_by_doc[doc] = terms / (sum_vi * weight_by_doc[doc])
 
     result_by_doc= sorted(result_by_doc.items(), key=lambda x: x[1], reverse=True)
@@ -195,7 +222,7 @@ def jaccard_measure(query, file_path):
             else:
                 weight_by_doc[doc] = weight**2
 
-    for doc, terms in terms_by_doc.items():
+    for (doc, terms) in terms_by_doc:
         result_by_doc[doc] = terms / (sum_vi + weight_by_doc[doc] - terms)
 
     result_by_doc= sorted(result_by_doc.items(), key=lambda x: x[1], reverse=True)
@@ -369,14 +396,17 @@ def boolean_model(query, Tokenize, PorterStemmer):
 
     return result_dict
 
+def precision(relevant_docs, selected_docs, i): 
+    selected_relevant_docs_i = [doc for doc in relevant_docs if doc in selected_docs[:i]]
+    return len(selected_relevant_docs_i) / i
 
-def precision(relevant_docs, retrieved_docs, cutoff=None):
+def precision_avg(relevant_docs, retrieved_docs, cutoff=None):
     total_retrieved = len(retrieved_docs[:cutoff])
     if total_retrieved == 0:
         return 0
     if cutoff == None:
         cutoff = total_retrieved
-    relevant_retrieved = len(set(relevant_docs) & set(retrieved_docs[:cutoff]))
+    relevant_retrieved = len(set(relevant_docs))
     return relevant_retrieved / cutoff
 
 def recall(relevant_docs, retrieved_docs, cutoff=None):
@@ -392,60 +422,74 @@ def f_score(precision_value, recall_value):
     else:
         return 0
     
-def interpolate_precision(precision_values, recall_values, recall_levels):
-    interpolated_precisions = []
-    for level in recall_levels:
-        max_precision = 0
-        for i in range(len(recall_values)):
-            if recall_values[i] >= level:
-                max_precision = max(max_precision, precision_values[i])
-        interpolated_precisions.append(max_precision)
-    return interpolated_precisions
 
-def plot_precision_recall_curve(relevant_docs, retrieved_docs):
-    recall_levels = [i / 10 for i in range(11)]
-    
-    # Calculate precision at each recall level
-    precision_values = [precision(relevant_docs, retrieved_docs, cutoff=int(len(retrieved_docs) * level)) for level in recall_levels]
-    
-    # Calculate interpolated precisions
-    interpolated_precisions = interpolate_precision(precision_values, recall_levels, recall_levels)
+def plot_precision_recall_curve(selected_docs, relevant_docs):
+    l = len(selected_docs) 
+    selected_relevant_docs = [doc for doc in relevant_docs if doc in selected_docs]
+    k = len(selected_relevant_docs) 
 
-    plt.plot(recall_levels, interpolated_precisions, marker='o', linestyle='-')
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
+    rp = [] 
+
+    for i in range(1,l):
+        pi = precision(relevant_docs, selected_docs, i) 
+        selected_relevant_docs_i = [doc for doc in relevant_docs if doc in selected_docs[:i]]
+        rp.append([pi, len(selected_relevant_docs_i)/k])
+
+    rp = pd.DataFrame(rp, columns=["Precision", "Rappel"]) 
+
+    rpi = [] 
+    j = 0.0
+    while j <= 1.0:
+        p_max = rp.loc[rp["Rappel"] >= j]["Precision"].max() 
+        rpi.append([j, p_max])
+        j += 0.1
+
+    rpi = pd.DataFrame(rpi, columns=["Rappel", "Precision"]) 
+    plt.figure() 
+    plt.title("Courbe Rappel/Précision") 
+    plt.xlabel("Rappel") 
+    plt.ylabel("Précision")
     plt.grid(True)
-    plt.legend()
+    plt.plot(rpi["Rappel"], rpi["Precision"])
     image_path = 'precision_recall_curve.png'
     plt.savefig(image_path, format='png')
     plt.close()
-
 
 def queries_tolist(queries_file):
     with open(queries_file, 'r') as file:
         queries = [line.strip().split('|', 1) for line in file]
     return queries
 
-def judgements_tolist(judgements_file):
-    query_relevant_docs = {}
+def judgements_tolist(file_path):
+    relevant_refs_by_query = {}
 
-    with open(judgements_file, 'r') as file:
-        lines = file.readlines()
+    with open(file_path, 'r') as file:
+        current_query_number = None
+        current_relevant_refs = []
+        relevant_refs_line = False
 
-        for line in lines:
-            tokens = line.split()
-            query_id = int(tokens[0])
-            num_relevant_docs = int(tokens[1])
-            relevant_docs = [int(tokens[i]) for i in range(2, len(tokens))]
-            query_relevant_docs[query_id] = {'num_relevant_docs': num_relevant_docs, 'relevant_docs': relevant_docs}
+        for line in file:
+            line = line.strip()
 
-    return query_relevant_docs
+            if line.startswith("Query"):
+                current_query_number = int(line.split()[1])
+                relevant_refs_by_query[current_query_number] = []
+
+            elif "Relevant Refs" in line:
+                relevant_refs_line = True
+
+            elif line.strip() and relevant_refs_line:
+                current_relevant_refs = line.split()
+                for val in current_relevant_refs[:-1]:
+                    relevant_refs_by_query[current_query_number].append(val)
+                relevant_refs_line = False
+
+    return relevant_refs_by_query
 
 def metrics(selected_docs, selected_relevant_docs):
-    precision_value = precision(selected_relevant_docs, selected_docs)
-    precision_5 = precision(selected_relevant_docs, selected_docs, 5)
-    precision_10 = precision(selected_relevant_docs, selected_docs, 10)
+    precision_value = precision_avg(selected_relevant_docs, selected_docs)
+    precision_5 = precision_avg(selected_relevant_docs, selected_docs, 5)
+    precision_10 = precision_avg(selected_relevant_docs, selected_docs, 10)
     recall_value = recall(selected_relevant_docs, selected_docs)
     f_score_value = f_score(precision_value, recall_value) 
 
@@ -505,12 +549,17 @@ class MyGUI(QMainWindow):
 
         self.display_search_results(filtered_results)
         
-
     def search(self):
 
         query = self.search_bar.text().strip().lower()
         self.PorterStemmer = self.checkBox_porter_stemmer.isChecked()
         self.Tokenize = self.checkBox_tokenization.isChecked()
+
+        if self.checkBox_queries_dataset.isChecked():
+            self.queries = queries_tolist(queries_file)
+            self.judgements = judgements_tolist(judgements_file)
+            query_id = self.spinBox.value()
+            query = self.queries[query_id][1]
 
         if self.radioButton_vsm.isChecked():
             self.sp = self.radioButton_SP.isChecked()
@@ -524,57 +573,59 @@ class MyGUI(QMainWindow):
                 self.B = self.lineEdit_B.text()
                 self.results = probabilistic_model(query, self.Tokenize, self.PorterStemmer, float(self.K), float(self.B))
 
-            else:
-                if self.radioButton_indexs.isChecked():
-                    self.Inverse = self.radioButton_inverse.isChecked()
-                    self.results = index(files, self.Inverse, self.Tokenize, self.PorterStemmer)
-                    self.results = OrderedDict(sorted(self.results.items()))
-                    
-                    if self.Inverse:
-                        if self.PorterStemmer:
-                            if self.Tokenize:
-                                filename = "InverseTokenPorter.txt"
-                            else:
-                                filename = "InverseSplitPorter.txt"
-                        else:
-                            if self.Tokenize:
-                                filename = "InverseTokenLancaster.txt"
-                            else:
-                                filename = "InverseSplitLancaster.txt"
-                    else:
-                        if self.PorterStemmer:
-                            if self.Tokenize:
-                                filename = "DescripteurTokenPorter.txt"
-                            else:
-                                filename = "DescripteurSplitPorter.txt"
-                        else:
-                            if self.Tokenize:
-                                filename = "DescripteurTokenLancaster.txt"
-                            else:
-                                filename = "DescripteurSplitLancaster.txt"
-                    
-                    write_dict_to_file(self.results, filename)
-                    self.display_search_results(self.results)
+            elif self.radioButton_bool.isChecked():
+                self.results = boolean_model(query, self.Tokenize, self.PorterStemmer)
 
-                elif self.radioButton_bool.isChecked():
-                    self.results = boolean_model(query, self.Tokenize, self.PorterStemmer)
-                    
         if self.checkBox_queries_dataset.isChecked():
-                
-                self.queries = queries_tolist(queries_file)
-                self.judgements = judgements_tolist(judgements_file)
-                dict = {key: value for key, value in self.result}
-                query_id = self.spinBox.value()
-                _, relevant_docs = judgement[query_id]
-                selected_docs = self.results.keys().tolist()
-                selected_relevant_docs = [doc for doc in relevant_docs if doc in selected_docs]
-                metric = metrics(selected_docs, selected_relevant_docs)
-                plot = plot_precision_recall_curve(relevant_docs, selected_docs)
+                relevant_docs = self.judgements[query_id]
+
+                if self.radioButton_bool.isChecked():
+                    if self.results is not None:
+                        self.results = list(self.results.items())
+                    else:
+                        metric = None
+                        plot = None
+                else:
+                    selected_docs = [item[0] for item in self.results]
+                    selected_relevant_docs = [doc for doc in relevant_docs if doc in selected_docs]
+
+                    metric = metrics(selected_docs, selected_relevant_docs)
+                    plot = plot_precision_recall_curve(selected_docs, relevant_docs)
 
         self.display_search_results2(self.results, metric, plot)
-    
-        
 
+        if self.radioButton_indexs.isChecked():
+            self.Inverse = self.radioButton_inverse.isChecked()
+            self.results = index(files, self.Inverse, self.Tokenize, self.PorterStemmer)
+            self.results = OrderedDict(sorted(self.results.items()))
+
+            if self.Inverse:
+                if self.PorterStemmer:
+                    if self.Tokenize:
+                        filename = "InverseTokenPorter.txt"
+                    else:
+                        filename = "InverseSplitPorter.txt"
+                else:
+                    if self.Tokenize:
+                        filename = "InverseTokenLancaster.txt"
+                    else:
+                        filename = "InverseSplitLancaster.txt"
+            else:
+                if self.PorterStemmer:
+                    if self.Tokenize:
+                        filename = "DescripteurTokenPorter.txt"
+                    else:
+                        filename = "DescripteurSplitPorter.txt"
+                else:
+                    if self.Tokenize:
+                        filename = "DescripteurTokenLancaster.txt"
+                    else:
+                        filename = "DescripteurSplitLancaster.txt"
+                    
+            write_dict_to_file(self.results, filename)
+            self.display_search_results(self.results)
+
+    
     def display_search_results(self, results):
         self.tableWidget.setHorizontalHeaderLabels(["Key", "Value", "Frequency", "Weight"])
         self.tableWidget.setRowCount(0)
@@ -596,6 +647,14 @@ class MyGUI(QMainWindow):
     def display_search_results2(self, results, metric, plot):
         self.tableWidget.setHorizontalHeaderLabels(["N Doc", "Relevance"])
         self.tableWidget.setRowCount(0)
+
+        # hna c pour checker si requete invalide pour boolean model 
+        # if self.radioButton_bool.isChecked():
+        #     if self.results == None:
+        #         rowPosition = self.tableWidget.rowCount()
+        #         self.tableWidget.insertRow(rowPosition)
+        #         self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem('Invalid query !'))
+        
         
         for (key, value) in results:
                 rowPosition = self.tableWidget.rowCount()
@@ -605,29 +664,27 @@ class MyGUI(QMainWindow):
                     self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(str(value)))
                 else:
                     self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(f"{float(value):.5f}"))
-                
-        total_width = self.tableWidget.viewport().width()
-        column_width = int(total_width / self.tableWidget.columnCount())
-        for column in range(self.tableWidget.columnCount()):
-            self.tableWidget.setColumnWidth(column, column_width)
 
-        precision_value, precision_5, precision_10, recall_value, f_score_value = metric
-        self.label_precision.setText(f"Precision = {precision_value:.5f}")
-        self.label_p5.setText(f"Precision@5: {precision_5:.5f}")
-        self.label_p10.setText(f"Precision@10: {precision_10:.5f}")
-        self.label_recall.setText(f"Recall: {recall_value:.5f}")
-        self.label_fscore.setText(f"F-score: {f_score_value:.5f}")
+        if self.results is not None:
+            total_width = self.tableWidget.viewport().width()
+            column_width = int(total_width / self.tableWidget.columnCount())
+            for column in range(self.tableWidget.columnCount()):
+                self.tableWidget.setColumnWidth(column, column_width)
 
-        # Set the plot
-        pixmap = QPixmap('precision_recall_curve.png')
-        item = QGraphicsPixmapItem(pixmap)
-        scene = QGraphicsScene()
-        scene.addItem(item)
+            precision_value, precision_5, precision_10, recall_value, f_score_value = metric
+            self.label_precision.setText(f"Precision = {precision_value:.5f}")
+            self.label_p5.setText(f"Precision@5: {precision_5:.5f}")
+            self.label_p10.setText(f"Precision@10: {precision_10:.5f}")
+            self.label_recall.setText(f"Recall: {recall_value:.5f}")
+            self.label_fscore.setText(f"F-score: {f_score_value:.5f}")
 
-        self.plot.setScene(scene)
+            # Set the plot
+            pixmap = QPixmap('precision_recall_curve.png')
+            item = QGraphicsPixmapItem(pixmap)
+            scene = QGraphicsScene()
+            scene.addItem(item)
 
-        
-
+            self.plot.setScene(scene)
 
 
 def main():

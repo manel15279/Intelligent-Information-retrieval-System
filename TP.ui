@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1186</width>
-    <height>889</height>
+    <width>1468</width>
+    <height>969</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,8 +19,8 @@
      <rect>
       <x>10</x>
       <y>160</y>
-      <width>831</width>
-      <height>681</height>
+      <width>911</width>
+      <height>771</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout">
@@ -53,7 +53,7 @@
         <number>10</number>
        </property>
        <property name="bottomMargin">
-        <number>20</number>
+        <number>0</number>
        </property>
        <item>
         <widget class="QTableWidget" name="tableWidget"/>
@@ -149,7 +149,7 @@
      <rect>
       <x>10</x>
       <y>70</y>
-      <width>831</width>
+      <width>911</width>
       <height>81</height>
      </rect>
     </property>
@@ -322,7 +322,7 @@
      <rect>
       <x>10</x>
       <y>0</y>
-      <width>831</width>
+      <width>911</width>
       <height>71</height>
      </rect>
     </property>
@@ -384,10 +384,10 @@
    <widget class="QWidget" name="verticalLayoutWidget_3">
     <property name="geometry">
      <rect>
-      <x>839</x>
+      <x>929</x>
       <y>-1</y>
-      <width>341</width>
-      <height>841</height>
+      <width>531</width>
+      <height>931</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_4">
@@ -433,7 +433,7 @@
          <rect>
           <x>0</x>
           <y>20</y>
-          <width>321</width>
+          <width>601</width>
           <height>451</height>
          </rect>
         </property>
@@ -477,19 +477,19 @@
              <rect>
               <x>10</x>
               <y>19</y>
-              <width>281</width>
-              <height>171</height>
+              <width>561</width>
+              <height>141</height>
              </rect>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_7">
              <property name="spacing">
-              <number>10</number>
+              <number>5</number>
              </property>
              <property name="topMargin">
-              <number>10</number>
+              <number>5</number>
              </property>
              <property name="bottomMargin">
-              <number>10</number>
+              <number>5</number>
              </property>
              <item>
               <widget class="QLabel" name="label_3">
@@ -553,8 +553,8 @@
              <rect>
               <x>9</x>
               <y>20</y>
-              <width>281</width>
-              <height>181</height>
+              <width>561</width>
+              <height>151</height>
              </rect>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_8">
@@ -629,10 +629,10 @@
        <widget class="QGraphicsView" name="plot">
         <property name="geometry">
          <rect>
-          <x>5</x>
+          <x>10</x>
           <y>490</y>
-          <width>311</width>
-          <height>321</height>
+          <width>491</width>
+          <height>341</height>
          </rect>
         </property>
        </widget>
@@ -646,7 +646,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1186</width>
+     <width>1468</width>
      <height>18</height>
     </rect>
    </property>
