@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1468</width>
+    <width>1596</width>
     <height>969</height>
    </rect>
   </property>
@@ -20,7 +20,7 @@
       <x>10</x>
       <y>160</y>
       <width>911</width>
-      <height>771</height>
+      <height>781</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout">
@@ -37,7 +37,7 @@
       <widget class="QLabel" name="results_label">
        <property name="font">
         <font>
-         <pointsize>10</pointsize>
+         <pointsize>8</pointsize>
          <weight>75</weight>
          <bold>true</bold>
         </font>
@@ -58,19 +58,21 @@
        <item>
         <widget class="QTableWidget" name="tableWidget"/>
        </item>
-       <item>
-        <widget class="QScrollBar" name="verticalScrollBar_4">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-        </widget>
-       </item>
       </layout>
      </item>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_5">
+       <property name="spacing">
+        <number>5</number>
+       </property>
+       <property name="leftMargin">
+        <number>5</number>
+       </property>
        <property name="topMargin">
         <number>10</number>
+       </property>
+       <property name="rightMargin">
+        <number>5</number>
        </property>
        <property name="bottomMargin">
         <number>10</number>
@@ -173,7 +175,7 @@
       <widget class="QGroupBox" name="groupBox_processing">
        <property name="font">
         <font>
-         <pointsize>10</pointsize>
+         <pointsize>8</pointsize>
          <weight>75</weight>
          <bold>true</bold>
         </font>
@@ -186,7 +188,7 @@
          <rect>
           <x>-1</x>
           <y>20</y>
-          <width>241</width>
+          <width>341</width>
           <height>41</height>
          </rect>
         </property>
@@ -244,7 +246,7 @@
         <widget class="QGroupBox" name="groupBox_value">
          <property name="font">
           <font>
-           <pointsize>10</pointsize>
+           <pointsize>8</pointsize>
            <weight>75</weight>
            <bold>true</bold>
           </font>
@@ -257,7 +259,7 @@
            <rect>
             <x>0</x>
             <y>20</y>
-            <width>248</width>
+            <width>331</width>
             <height>41</height>
            </rect>
           </property>
@@ -315,6 +317,19 @@
        </item>
       </layout>
      </item>
+     <item>
+      <widget class="QPushButton" name="indexation_btn">
+       <property name="font">
+        <font>
+         <weight>75</weight>
+         <bold>true</bold>
+        </font>
+       </property>
+       <property name="text">
+        <string>Indexing</string>
+       </property>
+      </widget>
+     </item>
     </layout>
    </widget>
    <widget class="QWidget" name="horizontalLayoutWidget">
@@ -346,7 +361,7 @@
       <widget class="QLabel" name="query_label">
        <property name="font">
         <font>
-         <pointsize>12</pointsize>
+         <pointsize>10</pointsize>
          <weight>75</weight>
          <bold>true</bold>
         </font>
@@ -386,8 +401,8 @@
      <rect>
       <x>929</x>
       <y>-1</y>
-      <width>531</width>
-      <height>931</height>
+      <width>651</width>
+      <height>951</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_4">
@@ -395,13 +410,13 @@
       <number>15</number>
      </property>
      <property name="leftMargin">
-      <number>10</number>
+      <number>15</number>
      </property>
      <property name="topMargin">
       <number>15</number>
      </property>
      <property name="rightMargin">
-      <number>10</number>
+      <number>15</number>
      </property>
      <property name="bottomMargin">
       <number>11</number>
@@ -420,7 +435,7 @@
       <widget class="QGroupBox" name="groupBox_2">
        <property name="font">
         <font>
-         <pointsize>10</pointsize>
+         <pointsize>8</pointsize>
          <weight>75</weight>
          <bold>true</bold>
         </font>
@@ -433,8 +448,8 @@
          <rect>
           <x>0</x>
           <y>20</y>
-          <width>601</width>
-          <height>451</height>
+          <width>611</width>
+          <height>301</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -469,6 +484,11 @@
          </item>
          <item>
           <widget class="QGroupBox" name="groupBox_4">
+           <property name="font">
+            <font>
+             <pointsize>8</pointsize>
+            </font>
+           </property>
            <property name="title">
             <string>Probalistic Model (BM25)</string>
            </property>
@@ -477,11 +497,11 @@
              <rect>
               <x>10</x>
               <y>19</y>
-              <width>561</width>
-              <height>141</height>
+              <width>571</width>
+              <height>71</height>
              </rect>
             </property>
-            <layout class="QVBoxLayout" name="verticalLayout_7">
+            <layout class="QHBoxLayout" name="horizontalLayout_4">
              <property name="spacing">
               <number>5</number>
              </property>
@@ -501,12 +521,19 @@
                 </font>
                </property>
                <property name="text">
-                <string>K</string>
+                <string>K :</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QLineEdit" name="lineEdit_K"/>
+              <widget class="QLineEdit" name="lineEdit_K">
+               <property name="font">
+                <font>
+                 <weight>50</weight>
+                 <bold>false</bold>
+                </font>
+               </property>
+              </widget>
              </item>
              <item>
               <widget class="QLabel" name="label_4">
@@ -518,12 +545,19 @@
                 </font>
                </property>
                <property name="text">
-                <string>B</string>
+                <string>B :</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QLineEdit" name="lineEdit_B"/>
+              <widget class="QLineEdit" name="lineEdit_B">
+               <property name="font">
+                <font>
+                 <weight>50</weight>
+                 <bold>false</bold>
+                </font>
+               </property>
+              </widget>
              </item>
             </layout>
            </widget>
@@ -553,11 +587,11 @@
              <rect>
               <x>9</x>
               <y>20</y>
-              <width>561</width>
-              <height>151</height>
+              <width>571</width>
+              <height>71</height>
              </rect>
             </property>
-            <layout class="QVBoxLayout" name="verticalLayout_8">
+            <layout class="QHBoxLayout" name="horizontalLayout_6">
              <property name="topMargin">
               <number>10</number>
              </property>
@@ -565,7 +599,7 @@
               <number>10</number>
              </property>
              <item>
-              <widget class="QRadioButton" name="radioButton_SP">
+              <widget class="QRadioButton" name="radioButton_JM">
                <property name="font">
                 <font>
                  <pointsize>8</pointsize>
@@ -574,7 +608,7 @@
                 </font>
                </property>
                <property name="text">
-                <string>Scalar Product</string>
+                <string>Jaccard Measure</string>
                </property>
               </widget>
              </item>
@@ -593,7 +627,7 @@
               </widget>
              </item>
              <item>
-              <widget class="QRadioButton" name="radioButton_JM">
+              <widget class="QRadioButton" name="radioButton_SP">
                <property name="font">
                 <font>
                  <pointsize>8</pointsize>
@@ -602,7 +636,7 @@
                 </font>
                </property>
                <property name="text">
-                <string>Jaccard Measure</string>
+                <string>Scalar Product</string>
                </property>
               </widget>
              </item>
@@ -630,9 +664,9 @@
         <property name="geometry">
          <rect>
           <x>10</x>
-          <y>490</y>
-          <width>491</width>
-          <height>341</height>
+          <y>330</y>
+          <width>601</width>
+          <height>501</height>
          </rect>
         </property>
        </widget>
@@ -646,7 +680,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1468</width>
+     <width>1596</width>
      <height>18</height>
     </rect>
    </property>

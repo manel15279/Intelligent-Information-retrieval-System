@@ -22,7 +22,7 @@ import pandas as pd
 
 #nltk.download()
 
-files = os.listdir(os.path.abspath("Collection"))
+files = "LISA COLLECTION\\docs.txt"
 queries_file = 'LISA COLLECTION\\Query.txt'
 judgements_file = 'LISA COLLECTION\\LISA.REL'
 
@@ -35,7 +35,6 @@ def tokenization(text):
 
 def stop_words(tokens):
     nltk_stopwords = nltk.corpus.stopwords.words('english')
-    tokens_without_stopwords = []
     tokens_without_stopwords = [word for word in tokens if word.lower() not in nltk_stopwords]
     return tokens_without_stopwords
 
@@ -75,6 +74,14 @@ def extract_documents(file_path):
         documents.append(current_document.copy())
     
     return documents
+
+
+def write_dict_to_file(dictionary, filename):
+    with open(filename, 'w', encoding='utf-8') as file:
+        for key, values in dictionary.items():
+            for value in values:
+                (files_list, freq, weight) = value
+                file.write(f"{key} {files_list} {freq} {weight:.4f}\n")
 
 def index(file_path, Inverse, Tokenize, PorterStemmer):
             word_file_count = defaultdict(set)
@@ -126,16 +133,31 @@ def index(file_path, Inverse, Tokenize, PorterStemmer):
                             dict[key1].append(value)
                         else:
                             dict[key1] = [value]
+            
+            if Inverse:
+                if Tokenize:
+                    if PorterStemmer:
+                        write_dict_to_file(dict, "InverseTokenPorter.txt")
+                    else:
+                        write_dict_to_file(dict, "InverseTokenLancaster.txt") 
+                else:
+                    if PorterStemmer:
+                        write_dict_to_file(dict, "InverseSplitPorter.txt") 
+                    else:
+                        write_dict_to_file(dict, "InverseSplitLancaster.txt") 
+            else:
+                if Tokenize:
+                    if PorterStemmer:
+                        write_dict_to_file(dict, "DescripteurTokenPorter.txt") 
+                    else:
+                        write_dict_to_file(dict, "DescripteurTokenLancaster.txt") 
+                else:
+                    if PorterStemmer:
+                        write_dict_to_file(dict, "DescripteurSplitPorter.txt") 
+                    else:
+                        write_dict_to_file(dict, "DescripteurSplitLancaster.txt") 
                             
             return dict
-
-
-def write_dict_to_file(dictionary, filename):
-    with open(filename, 'w', encoding='utf-8') as file:
-        for key, values in dictionary.items():
-            for value in values:
-                (files_list, freq, weight) = value
-                file.write(f"{key} {files_list} {freq} {weight:.5f}\n")
 
 def preprocess_query(query, Tokenize, PorterStemmer):
 
@@ -143,6 +165,22 @@ def preprocess_query(query, Tokenize, PorterStemmer):
         q = tokenization(query)
     else :
         q = query.split()
+
+    q = stop_words(q)
+
+    if PorterStemmer:
+        q = normalization_porter(q)
+    else:
+        q = normalization_lancaster(q)
+    return q
+
+def preprocess_boolean_query(query, Tokenize, PorterStemmer):
+
+    if Tokenize:
+        q = tokenization(query)
+    else :
+        q = query.split()
+
     if PorterStemmer:
         q = normalization_porter(q)
     else:
@@ -231,6 +269,7 @@ def jaccard_measure(query, file_path):
 
 def vectorial_model(query, Tokenize, PorterStemmer, SP, cosine, jaccard):
         query = preprocess_query(query, Tokenize, PorterStemmer)
+
         file_path = file(Tokenize, PorterStemmer)
         if SP:
             result = scalar_product(query, file_path)
@@ -272,7 +311,9 @@ def BM25(query, file_path, K, B):
             vocab_len += int(freq)
 
     N = len(dl)
+
     avdl = vocab_len / N
+
     ni = n_docs_terms(file_path, query)
 
     with open(file_path, 'r') as file:
@@ -307,7 +348,6 @@ def boolean_query(query):
     matches = re.findall(reg_exp, query)
 
     if not is_valid_boolean_query(matches):
-        print("La requête n'est pas valide.")
         return None
     return matches
 
@@ -382,7 +422,7 @@ def boolean_query_evaluation(query, file_path):
         return result_set
     
 def boolean_model(query, Tokenize, PorterStemmer):
-    query = preprocess_query(query, Tokenize, PorterStemmer)
+    query = preprocess_boolean_query(query, Tokenize, PorterStemmer)
     file_path = file(Tokenize, PorterStemmer)
 
     result_dict = {}
@@ -486,10 +526,10 @@ def judgements_tolist(file_path):
 
     return relevant_refs_by_query
 
-def metrics(selected_docs, selected_relevant_docs):
+def metrics(selected_docs, selected_relevant_docs, relevant_docs):
     precision_value = precision_avg(selected_relevant_docs, selected_docs)
-    precision_5 = precision_avg(selected_relevant_docs, selected_docs, 5)
-    precision_10 = precision_avg(selected_relevant_docs, selected_docs, 10)
+    precision_5 = precision(relevant_docs, selected_docs, 5)
+    precision_10 = precision(relevant_docs, selected_docs, 10)
     recall_value = recall(selected_relevant_docs, selected_docs)
     f_score_value = f_score(precision_value, recall_value) 
 
@@ -501,7 +541,7 @@ class MyGUI(QMainWindow):
     def __init__(self):
         super(MyGUI, self).__init__()
         uic.loadUi("TP.ui", self)
-        self.search_button.clicked.connect(self.search)
+        self.indexation_btn.clicked.connect(self.indexation)
         # Set column names
         self.tableWidget.setColumnCount(4)
         
@@ -509,23 +549,26 @@ class MyGUI(QMainWindow):
         header.setDefaultAlignment(QtCore.Qt.AlignLeft)
         
         self.results = {}
-        
         self.search_bar.setPlaceholderText("Search query...")
-        if self.radioButton_indexs.isChecked():
-            self.search_bar.textChanged.connect(self.query_results)
+        self.search_button.clicked.connect(self.decision)
         self.search_bar.setFixedHeight(50) 
+        self.indexation_btn.setFixedWidth(110)
 
         self.query = ""
         
         self.show()
-        
+    
+    def decision(self):
+        if self.checkBox_queries_dataset.isChecked() or self.radioButton_bool.isChecked() or self.radioButton_proba.isChecked() or self.radioButton_vsm.isChecked():
+            self.search()
+        else:
+            self.query_results()
+
         
     def query_results(self):
-        if self.radioButton_vsm.isChecked() or self.radioButton_proba.isChecked():
-            self.display_search_results2(self.results)
-        if  self.radioButton_bool.isChecked():
-            self.display_search_results3(self.results)
-        else:
+            self.Inverse = self.radioButton_inverse.isChecked()
+            self.PorterStemmer = self.checkBox_porter_stemmer.isChecked()
+            self.Tokenize = self.checkBox_tokenization.isChecked()
             query = self.search_bar.text().strip().lower()
             filtered_results = {}
             self.tableWidget.setColumnWidth(0, 50)
@@ -547,83 +590,63 @@ class MyGUI(QMainWindow):
                         if filtered_values:
                             filtered_results[key] = filtered_values
 
-        self.display_search_results(filtered_results)
+            self.display_search_results(filtered_results)
+
+    def indexation(self):
+            self.Inverse = self.radioButton_inverse.isChecked()
+            self.PorterStemmer = self.checkBox_porter_stemmer.isChecked()
+            self.Tokenize = self.checkBox_tokenization.isChecked()
+            self.results = index(files, self.Inverse, self.Tokenize, self.PorterStemmer)
+            self.display_search_results(self.results)
         
     def search(self):
-
-        query = self.search_bar.text().strip().lower()
-        self.PorterStemmer = self.checkBox_porter_stemmer.isChecked()
-        self.Tokenize = self.checkBox_tokenization.isChecked()
-
-        if self.checkBox_queries_dataset.isChecked():
-            self.queries = queries_tolist(queries_file)
-            self.judgements = judgements_tolist(judgements_file)
-            query_id = self.spinBox.value()
-            query = self.queries[query_id][1]
-
-        if self.radioButton_vsm.isChecked():
-            self.sp = self.radioButton_SP.isChecked()
-            self.cm = self.radioButton_CM.isChecked()
-            self.jm = self.radioButton_JM.isChecked()
-            self.results = vectorial_model(query, self.Tokenize, self.PorterStemmer, self.sp, self.cm, self.jm)
-
-        else :
-            if self.radioButton_proba.isChecked():
-                self.K = self.lineEdit_K.text()
-                self.B = self.lineEdit_B.text()
-                self.results = probabilistic_model(query, self.Tokenize, self.PorterStemmer, float(self.K), float(self.B))
-
-            elif self.radioButton_bool.isChecked():
-                self.results = boolean_model(query, self.Tokenize, self.PorterStemmer)
-
-        if self.checkBox_queries_dataset.isChecked():
-                relevant_docs = self.judgements[query_id]
-
-                if self.radioButton_bool.isChecked():
-                    if self.results is not None:
-                        self.results = list(self.results.items())
-                    else:
-                        metric = None
-                        plot = None
-                else:
-                    selected_docs = [item[0] for item in self.results]
-                    selected_relevant_docs = [doc for doc in relevant_docs if doc in selected_docs]
-
-                    metric = metrics(selected_docs, selected_relevant_docs)
-                    plot = plot_precision_recall_curve(selected_docs, relevant_docs)
-
-        self.display_search_results2(self.results, metric, plot)
-
-        if self.radioButton_indexs.isChecked():
             self.Inverse = self.radioButton_inverse.isChecked()
-            self.results = index(files, self.Inverse, self.Tokenize, self.PorterStemmer)
-            self.results = OrderedDict(sorted(self.results.items()))
+            self.PorterStemmer = self.checkBox_porter_stemmer.isChecked()
+            self.Tokenize = self.checkBox_tokenization.isChecked()
+            query = self.search_bar.text().strip().lower()
 
-            if self.Inverse:
-                if self.PorterStemmer:
-                    if self.Tokenize:
-                        filename = "InverseTokenPorter.txt"
+            if self.checkBox_queries_dataset.isChecked():
+                self.queries = queries_tolist(queries_file)
+                self.judgements = judgements_tolist(judgements_file)
+                query_id = self.spinBox.value()
+                query = self.queries[query_id-1][1]
+                self.search_bar.setText(query)
+
+            if self.radioButton_vsm.isChecked():
+                self.sp = self.radioButton_SP.isChecked()
+                self.cm = self.radioButton_CM.isChecked()
+                self.jm = self.radioButton_JM.isChecked()
+                self.results = vectorial_model(query, self.Tokenize, self.PorterStemmer, self.sp, self.cm, self.jm)
+
+            else :
+                if self.radioButton_proba.isChecked():
+                    self.K = self.lineEdit_K.text()
+                    self.B = self.lineEdit_B.text()
+                    self.results = probabilistic_model(query, self.Tokenize, self.PorterStemmer, float(self.K), float(self.B))
+
+                elif self.radioButton_bool.isChecked():
+                    self.results = boolean_model(query, self.Tokenize, self.PorterStemmer)
+
+            if self.checkBox_queries_dataset.isChecked():
+                    relevant_docs = self.judgements[query_id]
+
+                    if self.radioButton_bool.isChecked():
+                        if self.results is not None:
+                            self.results = list(self.results.items())
+                        else:
+                            metric = None
+                            plot = None
                     else:
-                        filename = "InverseSplitPorter.txt"
-                else:
-                    if self.Tokenize:
-                        filename = "InverseTokenLancaster.txt"
-                    else:
-                        filename = "InverseSplitLancaster.txt"
+                        selected_docs = [item[0] for item in self.results]
+                        selected_relevant_docs = [doc for doc in relevant_docs if doc in selected_docs]
+
+                        metric = metrics(selected_docs, selected_relevant_docs, relevant_docs)
+                        plot = plot_precision_recall_curve(selected_docs, relevant_docs)
+
+                    self.display_search_results2(self.results, metric, plot)
             else:
-                if self.PorterStemmer:
-                    if self.Tokenize:
-                        filename = "DescripteurTokenPorter.txt"
-                    else:
-                        filename = "DescripteurSplitPorter.txt"
-                else:
-                    if self.Tokenize:
-                        filename = "DescripteurTokenLancaster.txt"
-                    else:
-                        filename = "DescripteurSplitLancaster.txt"
-                    
-            write_dict_to_file(self.results, filename)
-            self.display_search_results(self.results)
+                self.display_search_results2(self.results)
+
 
     
     def display_search_results(self, results):
@@ -637,46 +660,48 @@ class MyGUI(QMainWindow):
                 self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem(str(key1)))
                 self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(str(value[0])))
                 self.tableWidget.setItem(rowPosition, 2, QTableWidgetItem(str(value[1])))
-                self.tableWidget.setItem(rowPosition, 3, QTableWidgetItem(f"{value[2]:.5f}"))
+                self.tableWidget.setItem(rowPosition, 3, QTableWidgetItem(f"{value[2]:.4f}"))
                 
         total_width = self.tableWidget.viewport().width()
         column_width = int(total_width / self.tableWidget.columnCount())
         for column in range(self.tableWidget.columnCount()):
             self.tableWidget.setColumnWidth(column, column_width)
     
-    def display_search_results2(self, results, metric, plot):
+    def display_search_results2(self, results, metric=None, plot=None):
         self.tableWidget.setHorizontalHeaderLabels(["N Doc", "Relevance"])
         self.tableWidget.setRowCount(0)
 
-        # hna c pour checker si requete invalide pour boolean model 
-        # if self.radioButton_bool.isChecked():
-        #     if self.results == None:
-        #         rowPosition = self.tableWidget.rowCount()
-        #         self.tableWidget.insertRow(rowPosition)
-        #         self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem('Invalid query !'))
-        
-        
-        for (key, value) in results:
+        if self.radioButton_bool.isChecked():
+            if self.results != None:
+                self.results = list(self.results.items())
+
+        if self.radioButton_bool.isChecked() and self.results == None:
                 rowPosition = self.tableWidget.rowCount()
                 self.tableWidget.insertRow(rowPosition)
-                self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem(str(key)))
-                if self.radioButton_bool.isChecked():
-                    self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(str(value)))
-                else:
-                    self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(f"{float(value):.5f}"))
+                self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem('Invalid query !'))
+        
+        else:  
+            for (key, value) in self.results:
+                    rowPosition = self.tableWidget.rowCount()
+                    self.tableWidget.insertRow(rowPosition)
+                    self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem(str(key)))
+                    if self.radioButton_bool.isChecked():
+                        self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(str(value)))
+                    else:
+                        self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(f"{float(value):.4f}"))
 
-        if self.results is not None:
+        if self.results is not None and self.checkBox_queries_dataset.isChecked():
             total_width = self.tableWidget.viewport().width()
             column_width = int(total_width / self.tableWidget.columnCount())
             for column in range(self.tableWidget.columnCount()):
                 self.tableWidget.setColumnWidth(column, column_width)
 
             precision_value, precision_5, precision_10, recall_value, f_score_value = metric
-            self.label_precision.setText(f"Precision = {precision_value:.5f}")
-            self.label_p5.setText(f"Precision@5: {precision_5:.5f}")
-            self.label_p10.setText(f"Precision@10: {precision_10:.5f}")
-            self.label_recall.setText(f"Recall: {recall_value:.5f}")
-            self.label_fscore.setText(f"F-score: {f_score_value:.5f}")
+            self.label_precision.setText(f"Precision = {precision_value:.4f}")
+            self.label_p5.setText(f"P@5: {precision_5:.4f}")
+            self.label_p10.setText(f"P@10: {precision_10:.4f}")
+            self.label_recall.setText(f"Recall: {recall_value:.4f}")
+            self.label_fscore.setText(f"F-score: {f_score_value:.4f}")
 
             # Set the plot
             pixmap = QPixmap('precision_recall_curve.png')
