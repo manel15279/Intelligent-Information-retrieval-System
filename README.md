@@ -1,12 +1,10 @@
 # Information Retrieval System: Indexing and Query Matching
 
----
 
 ## Overview
 
 This project implements an Information Retrieval System (IRS) that indexes documents and matches queries using various retrieval models. It aims to apply concepts learned in information retrieval courses, utilizing the LISA dataset for testing.
 
----
 
 ## Features
 
@@ -14,7 +12,6 @@ This project implements an Information Retrieval System (IRS) that indexes docum
 - **Query Matching**: Implement retrieval models such as scalar product, cosine measure, Jaccard measure, boolean models (AND, OR, NOT), and BM25 probabilistic model.
 - **Evaluation**: Compare retrieval models based on average precision, P@5, P@10, recall, F-measure, and plot precision-recall curves.
 
----
 
 ## Usage
 
