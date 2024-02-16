@@ -1,6 +1,18 @@
-import util
+import numpy as np
+import preprocessing
+
 
 def n_docs_terms(file_path, query):
+    """
+    Count the number of documents containing each term in the query.
+
+    Args:
+        file_path (str): Path to the file containing term-document frequencies.
+        query (list): List of query terms.
+
+    Returns:
+        dict: Dictionary containing term-document counts.
+    """
     documents_containing_terms = {}
 
     with open(file_path, 'r') as file:
@@ -17,7 +29,20 @@ def n_docs_terms(file_path, query):
                 break
     return documents_containing_terms
 
+
 def BM25(query, file_path, K, B):
+    """
+    Calculate BM25 scores for documents based on the query.
+
+    Args:
+        query (list): List of query terms.
+        file_path (str): Path to the file containing term-document frequencies.
+        K (float): BM25 constant K.
+        B (float): BM25 constant B.
+
+    Returns:
+        list: List of tuples containing (document_id, score) pairs, sorted by score in descending order.
+    """
     dl = {}
     result = {}
     vocab_len = 0
@@ -46,9 +71,23 @@ def BM25(query, file_path, K, B):
 
     return result
 
+
 def probabilistic_model(query, Tokenize, PorterStemmer, K, B):
-    query = util.preprocess_query(query, Tokenize, PorterStemmer)
-    file_path = util.file(Tokenize, PorterStemmer)
+    """
+    Perform probabilistic retrieval model.
+
+    Args:
+        query (str): Query text.
+        Tokenize (bool): Flag indicating whether to tokenize the query.
+        PorterStemmer (bool): Flag indicating whether to use Porter stemming.
+        K (float): BM25 constant K.
+        B (float): BM25 constant B.
+
+    Returns:
+        list: List of tuples containing (document_id, score) pairs, sorted by score in descending order.
+    """
+    query = preprocessing.preprocess_query(query, Tokenize, PorterStemmer)
+    file_path = preprocessing.file(Tokenize, PorterStemmer)
     result = BM25(query, file_path, K, B)
         
     return result

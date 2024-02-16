@@ -1,2 +1,0 @@
-Have recent language models delivered competitive results in information retrieval?
-What recent studies explore query expansion through embeddings?

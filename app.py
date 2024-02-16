@@ -1,155 +1,223 @@
-import gradio as gr
-import vectorialModel
-import probabilisticModel
-import booleanModel
+from PyQt5.QtWidgets import *
+from PyQt5 import QtCore, uic
+from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QGraphicsScene, QGraphicsPixmapItem
+from PyQt5.QtGui import QPixmap
+import nltk
+import metrics
 import indexer
-import evaluation
-import pandas as pd
+import vectorialModel
+import booleanModel
+import probabilisticModel
+import loader
+import os
+import preprocessing
 
-files = "LISA COLLECTION\\docs.txt"
-queries_file = 'LISA COLLECTION\\Query.txt'
-judgements_file = 'LISA COLLECTION\\LISA.REL'
+#nltk.download()
 
-def indexation(Inverse, Tokenize, PorterStemmer):
-    dict = indexer.index(files, Inverse, Tokenize, PorterStemmer)
+FILES_PATH = "LISA COLLECTION"
+DOCS_FILE = os.path.join(FILES_PATH, 'docs.txt')
+QUERIES_FILE = os.path.join(FILES_PATH, 'Query.txt')
+JUDGEMENTS_FILE = os.path.join(FILES_PATH, 'LISA.REL')
+
+
+class MyGUI(QMainWindow):
+
+    def __init__(self):
+        super(MyGUI, self).__init__()
+        uic.loadUi("TP.ui", self)
+        self.indexation_btn.clicked.connect(self.indexation)
+        # Set column names
+        self.tableWidget.setColumnCount(4)
+
+        header = self.tableWidget.horizontalHeader()
+        header.setDefaultAlignment(QtCore.Qt.AlignLeft)
+
+        self.results = {}
+        self.search_bar.setPlaceholderText("Search query...")
+        self.search_button.clicked.connect(self.handle_search)
+        self.search_bar.setFixedHeight(50)
+        self.indexation_btn.setFixedWidth(110)
+
+        self.query = ""
+
+        self.show()
+
+    def handle_search(self):
+        if self.checkBox_queries_dataset.isChecked():
+            self.search()
+        else:
+            self.display_query_results()
+        
+
+    def display_query_results(self):
+        """
+        Display query results based on selected options.
+        """
+        # Get selected options
+        self.Inverse = self.radioButton_inverse.isChecked()
+        self.PorterStemmer = self.checkBox_porter_stemmer.isChecked()
+        self.Tokenize = self.checkBox_tokenization.isChecked()
+        query = self.search_bar.text().strip().lower().split()  # Split query into terms
+        filtered_results = {}
+        self.tableWidget.setColumnWidth(0, 50)
+        
+        file_name = preprocessing.file(self.Tokenize, self.PorterStemmer, self.Inverse)
+
+        with open(file_name, 'r', encoding='utf-8') as file:
+            for line in file:
+                if not self.Inverse:
+                    file_number, term, frequency, weight = line.strip().split()
+                    if any(term.lower().startswith(q) for q in query):
+                        if file_number in filtered_results:
+                            filtered_results[file_number].append((term, int(frequency), float(weight)))
+                        else:
+                            filtered_results[file_number] = [(term, int(frequency), float(weight))]
+                else:
+                    term, file_number, frequency, weight = line.strip().split()
+                    if any(term.lower().startswith(q) for q in query):
+                        if term in filtered_results:
+                            filtered_results[term].append((int(file_number), int(frequency), float(weight)))
+                        else:
+                            filtered_results[term] = [(int(file_number), int(frequency), float(weight))]
+        
+        # Display filtered results
+        self.display_search_results(filtered_results)
+
+    def indexation(self):
+            """
+            Perform document indexation based on selected options.
+            """
+            self.Inverse = self.radioButton_inverse.isChecked()
+            self.PorterStemmer = self.checkBox_porter_stemmer.isChecked()
+            self.Tokenize = self.checkBox_tokenization.isChecked()
+            self.results = indexer.index(DOCS_FILE, self.Inverse, self.Tokenize, self.PorterStemmer)
+            self.display_search_results(self.results)
+        
+
+    def search(self):
+            """
+            Perform search based on selected options.
+            """
+            self.Inverse = self.radioButton_inverse.isChecked()
+            self.PorterStemmer = self.checkBox_porter_stemmer.isChecked()
+            self.Tokenize = self.checkBox_tokenization.isChecked()
+            query = self.search_bar.text().strip().lower()
+
+            if self.checkBox_queries_dataset.isChecked():
+                self.queries = loader.load_queries(QUERIES_FILE)
+                self.judgements = loader.load_judgements(JUDGEMENTS_FILE)
+                query_id = self.spinBox.value()
+                query = self.queries[query_id-1][1]
+                self.search_bar.setText(query)
+
+            if self.radioButton_vsm.isChecked():
+                self.sp = self.radioButton_SP.isChecked()
+                self.cm = self.radioButton_CM.isChecked()
+                self.jm = self.radioButton_JM.isChecked()
+                self.results = vectorialModel.vectorial_model(query, self.Tokenize, self.PorterStemmer, self.sp, self.cm, self.jm)
+
+            else :
+                if self.radioButton_proba.isChecked():
+                    self.K = self.lineEdit_K.text()
+                    self.B = self.lineEdit_B.text()
+                    self.results = probabilisticModel.probabilistic_model(query, self.Tokenize, self.PorterStemmer, float(self.K), float(self.B))
+
+                elif self.radioButton_bool.isChecked():
+                    self.results = booleanModel.boolean_model(query, self.Tokenize, self.PorterStemmer)
+
+            if self.checkBox_queries_dataset.isChecked():
+                    relevant_docs = self.judgements[query_id]
+
+                    if self.radioButton_bool.isChecked():
+                        if self.results is not None:
+                            self.results = list(self.results.items())
+                        else:
+                            metric = None
+                            plot = None
+                    else:
+                        selected_docs = [item[0] for item in self.results]
+                        selected_relevant_docs = [doc for doc in relevant_docs if doc in selected_docs]
+
+                        metric = metrics.get_metrics(selected_docs, selected_relevant_docs, relevant_docs)
+                        plot = metrics.plot_precision_recall_curve(selected_docs, relevant_docs)
+
+                    self.display_search_results2(self.results, metric, plot)
+            else:
+                self.display_search_results2(self.results)
+
     
-
-def queries_tolist(queries_file):
-    with open(queries_file, 'r') as file:
-        queries = [line.strip().split('|', 1) for line in file]
-    print(queries)
-    return queries
-
-def judgements_tolist(file_path):
-    relevant_refs_by_query = {}
-
-    with open(file_path, 'r') as file:
-        current_query_number = None
-        current_relevant_refs = []
-        relevant_refs_line = False
-
-        for line in file:
-            line = line.strip()
-
-            if line.startswith("Query"):
-                current_query_number = int(line.split()[1])
-                relevant_refs_by_query[current_query_number] = []
-
-            elif "Relevant Refs" in line:
-                relevant_refs_line = True
-
-            elif line.strip() and relevant_refs_line:
-                current_relevant_refs = line.split()
-                for val in current_relevant_refs[:-1]:
-                    relevant_refs_by_query[current_query_number].append(val)
-                relevant_refs_line = False
-
-    return relevant_refs_by_query
-
-def get_irs(irs):
-    if irs == "Vectorial":
-        return gr.Dropdown.update(choices=["Scalar Product", "Cosine Measure", "Jaccard Measure"])
-    elif irs == "Boolean":
-        return gr.Dropdown.update(choices=["Boolean Evaluation"])
-    elif irs == "Probabilistic":
-        return gr.Dropdown.update(choices=["BM25"])
-
-def update_sliders(irs):
-    if irs == "Probabilistic": return gr.Slider.update(visible=True)
-    else: return gr.Slider.update(visible=False)
-
-def set_queries():
-    return gr.Dropdown.update(choices=queries_tolist(queries_file)[:, 1])
-
-
-# fonction qui permet de définir la liste des documents en fonction du type de stemmer choisi
-def update_docs(stem):
-    return gr.Dropdown.update(choices=files.get_docs(stem))
-
-# fonction qui permet de définir la liste des termes en fonction du type de stemmer choisi
-def update_terms(stem):
-    return gr.Dropdown.update(choices=files.get_terms(stem))
-
-with gr.Blocks() as demo:
-    
-    gr.Markdown("<center><h1>Informarion Retrieval Systems</h1></center>")
-
-    with gr.Tab("Indexation"):
-        with gr.Column():
-
-            with gr.Row():
-                search = gr.Textbox(label="Search a query", placeholder='Search...')
-                search_btn = gr.Button("Search") 
-
-            with gr.Row():
-                indexation_type = gr.Radio(label='Indexation', info="Select the file type :", choices=['Inverse', "Descriptor"])
-                tokenization_type = gr.Radio(label='Tokenization', info="Select the tokenization method :", choices=['Inverse', "Descriptor"])
-                stemmer_selector = gr.Radio(choices=["Porter", "Lancaster"], label="Stemming", info="Select a stemming method :")
-                btn0 = gr.Button("Indexing") 
-
-            with gr.Row():
-                results = gr.DataFrame(label="Results")
-                btn0.click(fn=indexation, inputs=[indexation_type, tokenization_type, stemmer_selector], outputs=results) 
-                search_btn.click(fn=filter_results, inputs=[search, indexation_type, tokenization_type, stemmer_selector], outputs=results)
-
+    def display_search_results(self, results):
+        """
+        Display search results in the table widget.
+        """
+        self.tableWidget.setHorizontalHeaderLabels(["Key", "Value", "Frequency", "Weight"])
+        self.tableWidget.setRowCount(0)
+        
+        for key1, values in results.items():
+            for value in values:
+                rowPosition = self.tableWidget.rowCount()
+                self.tableWidget.insertRow(rowPosition)
+                self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem(str(key1)))
+                self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(str(value[0])))
+                self.tableWidget.setItem(rowPosition, 2, QTableWidgetItem(str(value[1])))
+                self.tableWidget.setItem(rowPosition, 3, QTableWidgetItem(f"{value[2]:.4f}"))
                 
-        with gr.Column(scale=1):
-            with gr.Row():
-                doc_selector = gr.Dropdown(label="Documents") # menu déroulant pour choisir les document à afficher
-                stemmer_selector.change(update_docs, stemmer_selector, doc_selector) # on appelle la fonction update_docs qui va mettre à jour la liste des documents en fonction du type de stemmer choisi
-                btn_doc = gr.Button("Show Document") # bouton pour afficher le fichier descripteur selon le document choisit
-            with gr.Row():
-                # dataframe pour afficher le fichier descripteur
-                fichier_descripteur = gr.DataFrame(pd.DataFrame(columns=["Teme", "Freq", "Poids"]), label="Fichier Descripteur")
-                # on appelle la fonction rech_fichier_descripteur qui va afficher le fichier descripteur selon le document choisi
-                btn_doc.click(fn=files.rech_fichier_descripteur, inputs=[doc_selector, stemmer_selector], outputs=[fichier_descripteur])
-        with gr.Column(scale=1):
-            with gr.Row():
-                term_selector = gr.Dropdown(label="Terms") # menu déroulant pour choisir les termes à afficher
-                stemmer_selector.change(update_terms, stemmer_selector, term_selector) # on appelle la fonction update_terms qui va mettre à jour la liste des termes en fonction du type de stemmer choisi
-                btn_term = gr.Button("Show Term") # bouton pour afficher le fichier inverse selon le terme choisi
-            with gr.Row():
-                # dataframe pour afficher le fichier inverse
-                fichier_inverse = gr.DataFrame(pd.DataFrame(columns=["Teme", "Freq", "Poids"]), label="Fichier inverse")
-                # on appelle la fonction rech_fichier_inverse qui va afficher le fichier inverse selon le terme choisi
-                btn_term.click(fn=files.rech_fichier_inverse, inputs=[term_selector, stemmer_selector], outputs=[fichier_inverse])
-    with gr.Tab("Appariement"):
-        with gr.Row():
-            with gr.Column(scale=1):
-                # menu déroulant pour choisir le type de irs
-                irs_selector = gr.Dropdown(["Vectorial", "Boolean", "Probabilistic", "Text Mining", "Deep Learning"], label="irs")
+        total_width = self.tableWidget.viewport().width()
+        column_width = int(total_width / self.tableWidget.columnCount())
+        for column in range(self.tableWidget.columnCount()):
+            self.tableWidget.setColumnWidth(column, column_width)
+    
+    def display_search_results2(self, results, metric=None, plot=None):
+        self.tableWidget.setHorizontalHeaderLabels(["N Doc", "Relevance"])
+        self.tableWidget.setRowCount(0)
 
-                function_selector = gr.Dropdown(label="Function", visible=True) # menu déroulant pour choisir le type de fonction de similarité
-                irs_selector.change(get_function, irs_selector, function_selector) # on appelle la fonction get_function qui va mettre à jour la liste des fonctions en fonction du type de irs choisi
+        if self.radioButton_bool.isChecked():
+            if self.results != None:
+                self.results = list(self.results.items())
 
-                query_selector = gr.Dropdown(label="Query", visible=True) # menu déroulant pour choisir la requête à afficher
-                irs_selector.change(get_set_queries, irs_selector, query_selector) # on appelle la fonction get_set_queries qui va mettre à jour la liste des requêtes en fonction du type de irs choisi
+        if self.radioButton_bool.isChecked() and self.results == None:
+                rowPosition = self.tableWidget.rowCount()
+                self.tableWidget.insertRow(rowPosition)
+                self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem('Invalid query !'))
+        
+        else:  
+            for (key, value) in self.results:
+                    rowPosition = self.tableWidget.rowCount()
+                    self.tableWidget.insertRow(rowPosition)
+                    self.tableWidget.setItem(rowPosition, 0, QTableWidgetItem(str(key)))
+                    if self.radioButton_bool.isChecked():
+                        self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(str(value)))
+                    else:
+                        self.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(f"{float(value):.4f}"))
 
-                b_value = gr.Slider(0.5, 0.75, 0.6, label="b value", visible=False) # slider pour choisir la valeur de b
-                irs_selector.change(update_sliders, irs_selector, b_value) # on appelle la fonction update_sliders qui va mettre à jour l'affichage du slider en fonction du type de irs choisi
-                k_value = gr.Slider(1.2, 2, 1.5, label="k value", visible=False) # slider pour choisir la valeur de k
-                irs_selector.change(update_sliders, irs_selector, k_value) # on appelle la fonction update_sliders qui va mettre à jour l'affichage du slider en fonction du type de irs choisi
+        if self.results is not None and self.checkBox_queries_dataset.isChecked():
+            total_width = self.tableWidget.viewport().width()
+            column_width = int(total_width / self.tableWidget.columnCount())
+            for column in range(self.tableWidget.columnCount()):
+                self.tableWidget.setColumnWidth(column, column_width)
 
-                radius = gr.Slider(0, 1, 0.6, label="Radius", visible=False) # slider pour choisir la valeur du rayon
-                irs_selector.change(update_dbscan_rad, irs_selector, radius) # on appelle la fonction update_dbscan_rad qui va mettre à jour l'affichage du slider en fonction du type de irs choisi
-                min_neighbours = gr.Number(value= 200, label="Min Neighbours", visible=False) # nombre pour choisir le nombre de voisins minimum
-                irs_selector.change(update_dbscan_minn, irs_selector, min_neighbours) # on appelle la fonction update_dbscan_minn qui va mettre à jour l'affichage de la nombrebox en fonction du type de irs choisi
+            precision_value, precision_5, precision_10, recall_value, f_score_value = metric
+            self.label_precision.setText(f"Precision = {precision_value:.4f}")
+            self.label_p5.setText(f"P@5: {precision_5:.4f}")
+            self.label_p10.setText(f"P@10: {precision_10:.4f}")
+            self.label_recall.setText(f"Recall: {recall_value:.4f}")
+            self.label_fscore.setText(f"F-score: {f_score_value:.4f}")
 
-                btn1 = gr.Button("Compute") # bouton pour lancer le calcul de la similarité
-            with gr.Column(scale=3):
-                df_out = gr.DataFrame(pd.DataFrame(columns=["Document", "Score"]), label="Results") # dataframe pour afficher les résultats
-                # on appelle la fonction apply_irs qui va calculer la similarité selon le type de irs choisi
-                btn1.click(fn=irs.apply_irs, inputs=[stemmer_selector, query_selector, function_selector, b_value, k_value, radius, min_neighbours], outputs=df_out)
-            with gr.Column(scale=1):
-                p = gr.Number(label="Precision") # nombrebox pour afficher la précision
-                p5 = gr.Number(label="P@5") # nombrebox pour afficher la précision à 5
-                irs_selector.change(update_displayed_metrics, irs_selector, p5) # on appelle la fonction update_displayed_metrics qui va mettre à jour l'affichage des nombrebox en fonction du type de irs choisi
-                p10 = gr.Number(label="P@10") # nombrebox pour afficher la précision à 10
-                irs_selector.change(update_displayed_metrics, irs_selector, p10) # on appelle la fonction update_displayed_metrics qui va mettre à jour l'affichage des nombrebox en fonction du type de irs choisi
-                metrics_out = [p, p5, p10, gr.Number(label="Recall"), gr.Number(label="F measure"), gr.Plot()] # liste des nombrebox pour afficher les métriques
-                btn2 = gr.Button("Compute Metrics") # bouton pour lancer le calcul des métriques
-                irs_selector.change(update_metrics_button, irs_selector, btn2) # on appelle la fonction update_metrics_button qui va mettre à jour l'affichage du bouton en fonction du type de irs choisi
-                btn2.click(fn=irs.metrics, inputs=[query_selector, df_out], outputs=metrics_out) # on appelle la fonction metrics qui va calculer les métriques selon le type de irs choisi
+            # Set the plot
+            pixmap = QPixmap('plots\precision_recall_curve.png')
+            item = QGraphicsPixmapItem(pixmap)
+            scene = QGraphicsScene()
+            scene.addItem(item)
 
-if __name__ == "__main__":
-    demo.launch()
+            self.plot.setScene(scene)
+
+
+def main():
+    app = QApplication([])
+    window = MyGUI()
+    app.exec_()
+
+
+if __name__ == '__main__':
+    main()
