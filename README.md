@@ -4,7 +4,7 @@
 
 ## Overview
 
-This project implements an Information Retrieval System (IRS) that indexes documents and matches queries using various retrieval models. It aims to apply concepts learned in information retrieval courses, utilizing the LISA dataset for testin
+This project implements an Information Retrieval System (IRS) that indexes documents and matches queries using various retrieval models. It aims to apply concepts learned in information retrieval courses, utilizing the LISA dataset for testing.
 
 ---
 
